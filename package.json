@@ -1,0 +1,15 @@
+{
+  "private": true,
+  "scripts": {
+    "test": "node tests/regression.cjs",
+    "test:layout": "node tests/layout.cjs",
+    "test:scroll": "node tests/scroll.cjs",
+    "test:startup": "node tests/startup.cjs"
+  },
+  "devDependencies": {
+    "jsdom": "30.1.2",
+    "playwright": "1.51.1",
+    "jquery": "3.7.1",
+    "jquery-ui-dist": "1.13.3"
+  }
+}
