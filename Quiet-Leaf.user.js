@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Quiet Leaf — Internet Archive
 // @namespace    quiet-leaf
-// @version      0.6.2
+// @version      0.6.3
 // @description  Single-page or continuous scanned pages, automatic progress, native coloured bookmarks and reading activity.
 // @match        https://archive.org/details/*
 // @match        https://archive.org/stream/*
@@ -28,21 +28,29 @@
   }
   const pages = () => findAll('.BRpagecontainer[data-index]');
   const imageOf = el => el?.querySelector('img.BRpageimage, img');
-  function hashIndex() {
-    const value = location.hash.match(/(?:^#|\/)page\/n(\d+)(?:\/|$)/);
-    return value ? Number(value[1]) : null;
+  function urlIndex() {
+    const value = (location.hash || '').match(/(?:^#|\/)page\/n(\d+)(?:\/|$)/)
+      || location.pathname.match(/\/page\/n(\d+)(?:\/|$)/);
+    const index=value?Number(value[1]):null;
+    return isIndex(index)?index:null;
+  }
+  function pageSlider() {
+    const sliders=findAll('[aria-label="Page navigation slider"]');
+    // Prefer the visible control; both native controls remain keyboard-operable
+    // when Archive hides its navigation. Never change their layout to navigate.
+    return sliders.find(el=>el.getClientRects().length&&getComputedStyle(el).visibility!=='hidden')||sliders[0];
   }
   function readerIndex() {
-    const slider=findAll('[aria-label="Page navigation slider"][aria-valuenow]')[0];
-    if(slider){const n=Number(slider.getAttribute('aria-valuenow'));if(isIndex(n))return n;}
-    return hashIndex();
+    const slider=pageSlider(),value=slider?.getAttribute('aria-valuenow');
+    if(value!==null&&value!==undefined){const n=Number(value);if(isIndex(n))return n;}
+    return urlIndex();
   }
   function currentPage() {
     const all = pages();
     const hash = readerIndex();
     const exact = all.find(el => isIndex(hash) && Number(el.dataset.index) === hash);
     if (exact) return exact;
-    const label = location.hash.match(/(?:^#|\/)page\/([^/]+)/)?.[1];
+    const label = (location.hash || location.pathname).match(/(?:^#|\/)page\/([^/]+)/)?.[1];
     if (label) {
       const named = all.find(el => el.dataset.pageNum === decodeURIComponent(label));
       if (named) return named;
@@ -67,10 +75,10 @@
   function bookIdentifier() {
     const parts = location.pathname.split('/').filter(Boolean);
     const id = decodeURIComponent(parts[1] || '');
-    let sub = id;
+    let sub = parts[2]&&!['page','mode','search'].includes(parts[2])?decodeURIComponent(parts[2]):id;
     try {
       const options = JSON.parse(document.querySelector('input.js-bookreader')?.value || '{}');
-      sub = new URL(options.url, location.href).searchParams.get('subPrefix') || id;
+      sub = new URL(options.url, location.href).searchParams.get('subPrefix') || sub;
     } catch {}
     return sub === id ? id : id + '/' + sub;
   }
@@ -215,7 +223,7 @@
     }
 
     const launch=document.createElement('button');
-    launch.id='quiet-leaf-launch';launch.type='button';launch.textContent='Read quietly · 0.6.2';
+    launch.id='quiet-leaf-launch';launch.type='button';launch.textContent='Read quietly · 0.6.3';
     launch.style.cssText='all:initial!important;position:fixed!important;right:16px!important;bottom:calc(20px + env(safe-area-inset-bottom))!important;z-index:2147483647!important;display:block!important;visibility:visible!important;opacity:1!important;padding:16px 22px!important;background:#28231c!important;color:#fff2da!important;border:1px solid #c8ac7a!important;border-radius:28px!important;font:17px Georgia,serif!important;cursor:pointer!important;box-shadow:0 3px 18px #0005!important;';
     document.documentElement.append(launch);
     let session=null;
@@ -248,14 +256,14 @@
       .BRtextLayer ::selection{background:rgba(86,155,230,.4);color:transparent}
       .paper-controls{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:12px;font-size:14px}
       .paper-controls label{display:flex;align-items:center;gap:8px}.paper-controls select{min-height:44px;padding:8px;background:#292929;color:#f5ebdc;border:1px solid #ffffff40;border-radius:8px;font:inherit}.paper-controls input{width:120px;min-height:44px;accent-color:#d4b27a}.paper-controls output{min-width:3.5em;font-variant-numeric:tabular-nums}
-      .bar,.note,.error{-webkit-user-select:none;user-select:none}
+      .bar,.note,.error{-webkit-user-select:none;user-select:none}.controls-toggle{position:absolute;z-index:3;right:12px;top:calc(10px + env(safe-area-inset-top));opacity:.45;background:#202020cc}.controls-toggle:hover,.controls-toggle:focus{opacity:1}
       .bar{max-height:85%;overflow-y:auto;z-index:4;position:absolute;top:0;left:0;right:0;background:#202020f5;padding:calc(10px + env(safe-area-inset-top)) 12px 12px;box-shadow:0 4px 25px #0008}
       .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.position{margin-right:auto;font-size:14px}.status{margin:12px 2px 0;color:#c4c4c4;font-size:13px;line-height:1.6}
       button{min-height:44px;padding:8px 14px;border:1px solid #ffffff40;border-radius:8px;background:#ffffff16;color:inherit;font:inherit;cursor:pointer}button:disabled{opacity:.5;cursor:default}button:focus-visible{outline:3px solid #dfba76}.bookmark{border-color:#619cdb}
       .note{position:absolute;bottom:calc(24px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:max-content;max-width:90%;background:#202020ef;border-radius:12px;padding:12px 18px;text-align:center;line-height:1.5;pointer-events:none}
       .error{z-index:5;position:absolute;bottom:calc(20px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(92%,520px);padding:18px;background:#161616f5;border:1px solid #a56c52;border-radius:14px;line-height:1.5;box-shadow:0 6px 30px #0008}.error p{margin:0 0 14px}.error .row{justify-content:center}
       </style><div class="stage" aria-label="Left sixth: previous page. Remaining screen: next page. Two-finger tap for controls; hold a word to select it."></div>
-      <div class="bar" hidden><div class="row"><span class="position">Opening…</span><button class="bookmark">Blue bookmark</button><button class="resume">Return to farthest</button><button class="reset">Set progress here</button><button class="sync">Sync now</button><button class="full">Full screen</button><button class="hide">Hide controls</button><button class="exit">Back to Archive</button></div><div class="paper-controls"><label>Reading <select class="layout" aria-label="Reading mode"><option value="single">Single page</option><option value="scroll">Continuous scroll</option></select></label><label>Paper <select class="paper" aria-label="Paper appearance"><option value="original">Original scan</option><option value="pulp">Clean pulp</option><option value="cream">Warm cream</option><option value="gray">Grayscale</option></select></label><label>Contrast <input class="contrast" type="range" min="90" max="160" step="1" aria-label="Scan contrast"><output class="contrast-value"></output></label><label>Brightness <input class="brightness" type="range" min="85" max="130" step="1" aria-label="Paper brightness"><output class="brightness-value"></output></label></div><p class="status" role="status"></p></div>
+      <button class="controls-toggle" aria-label="Show reading controls" title="Reading controls">⋯</button><div class="bar" hidden><div class="row"><span class="position">Opening…</span><button class="bookmark">Blue bookmark</button><button class="resume">Return to farthest</button><button class="reset">Set progress here</button><button class="sync">Sync now</button><button class="full">Full screen</button><button class="hide">Hide controls</button><button class="exit">Back to Archive</button></div><div class="paper-controls"><label>Reading <select class="layout" aria-label="Reading mode"><option value="single">Single page</option><option value="scroll">Continuous scroll</option></select></label><label>Paper <select class="paper" aria-label="Paper appearance"><option value="original">Original scan</option><option value="pulp">Clean pulp</option><option value="cream">Warm cream</option><option value="gray">Grayscale</option></select></label><label>Contrast <input class="contrast" type="range" min="90" max="160" step="1" aria-label="Scan contrast"><output class="contrast-value"></output></label><label>Brightness <input class="brightness" type="range" min="85" max="130" step="1" aria-label="Paper brightness"><output class="brightness-value"></output></label></div><p class="status" role="status"></p></div>
       <div class="note" role="status" hidden></div><div class="error" hidden><p></p><div class="row"><button class="retry">Retry</button><button class="cancel">Keep current page</button><button class="error-exit">Back to Archive</button></div></div>`;
       const $=q=>root.querySelector(q),stage=$('.stage'),bar=$('.bar'),note=$('.note'),error=$('.error');
       document.documentElement.append(host);launch.style.setProperty('display','none','important');host.focus({preventScroll:true});
@@ -304,7 +312,7 @@
       listen(window,'BookReader:userAction',()=>activityEvents++);
       listen(window,'BookReader:pageChanged',e=>{
         pageEvents++;
-        const index=e.detail?.props?.firstIndex;
+        const index=e.detail?.props?.index ?? e.detail?.props?.firstIndex;
         if(isIndex(index))nativeIndex=index;
         else {const p=currentPage();if(p)nativeIndex=Number(p.dataset.index);}
       });
@@ -426,40 +434,29 @@
         $('.retry').focus();updateUI();
       }
       function selectLeaf(index){
-        // Drive the native jQuery UI pager through DOM mouse events. The native
-        // slidechange handler performs jumpToIndex and retains loan handling.
-        // This works in the content world without an open Bookmarks panel.
-        const handle=findAll('[aria-label="Page navigation slider"]')[0];
-        const rail=handle?.closest('.BRpager');
-        if(!rail){
+        const handle=pageSlider();
+        if(!handle?.closest('.BRpager')){
           const list=findAll('ia-bookmarks-list')[0];
           if(list){list.dispatchEvent(new CustomEvent('bookmarkSelected',{detail:{bookmark:{id:index,leafNum:index}}}));return;}
-          throw new Error('Archive’s page slider is not ready. Retry, or return to Archive and wait for the reader to load.');
+          throw new Error('Archive’s page control is not ready. Return to Archive and wait for the reader to load.');
         }
         const min=Number(handle.getAttribute('aria-valuemin')||0),max=Number(handle.getAttribute('aria-valuemax'));
-        if(!Number.isFinite(max)||max<=min||index<min||index>max)throw new Error('This scan is outside Archive’s available page range.');
-        const saved=[];
-        const save=el=>{saved.push([el,el.getAttribute('style')]);};
-        try{
-          // Hidden navigation must still have measurable geometry. Restore every
-          // inline style immediately, before the browser paints another frame.
-          for(let el=rail.parentElement;el;el=el.parentElement){
-            if(getComputedStyle(el).display==='none'){save(el);el.style.setProperty('display','block','important');}
-          }
-          save(rail);
-          for(const [key,value] of Object.entries({position:'fixed',left:'0px',top:'0px',width:'1000px',height:'10px',display:'block',opacity:'0',transform:'none'}))rail.style.setProperty(key,value,'important');
-          const box=rail.getBoundingClientRect();
-          if(!box.width)throw new Error('Archive’s page slider cannot be measured. Return to Archive and reload the reader.');
-          const clientX=box.left+box.width*(index-min)/(max-min),clientY=box.top+box.height/2;
-          const opts={bubbles:true,cancelable:true,view:window,button:0,clientX,clientY};
-          rail.dispatchEvent(new MouseEvent('mousedown',{...opts,buttons:1}));
-          document.dispatchEvent(new MouseEvent('mouseup',{...opts,buttons:0}));
-        }finally{
-          for(const [el,style] of saved.reverse())if(style===null)el.removeAttribute('style');else el.setAttribute('style',style);
-        }
+        if(!isIndex(max)||index<min||index>max)throw new Error('This scan is outside Archive’s available page range.');
+        const now=readerIndex()??nativeIndex;
+        if(!isIndex(now))throw new Error('Archive’s current scan could not be identified.');
+        const steps=Math.abs(index-now);
+        if(!steps)return;
+        if(steps>20000)throw new Error('This page jump is too large. Select a nearer page in Archive first.');
+        // BookReader exposes Left/Right to jQuery UI. Repeated keydowns followed
+        // by ONE keyup select an exact leaf and commit ONE jump. Mouse coordinates
+        // can round to a neighbouring leaf, especially in long volumes on Safari.
+        const key=index>now?'ArrowRight':'ArrowLeft',keyCode=index>now?39:37;
+        const options={key,code:key,keyCode,which:keyCode,bubbles:true,cancelable:true,view:window};
+        for(let step=0;step<steps;step++)handle.dispatchEvent(new KeyboardEvent('keydown',options));
+        handle.dispatchEvent(new KeyboardEvent('keyup',options));
       }
       function pageLimit(){
-        const slider=findAll('[aria-label="Page navigation slider"][aria-valuemax]')[0];
+        const slider=pageSlider();
         const max=Number(slider?.getAttribute('aria-valuemax'));
         return slider&&isIndex(max)?max:Infinity;
       }
@@ -580,7 +577,7 @@
         if(closed || !isIndex(index))return;
         const observedIndex=readerIndex();if(isIndex(observedIndex))nativeIndex=observedIndex;
         clearTimeout(waitTimer);target=index;waiting=true;error.hidden=true;updateUI();
-        const id=++requestId,started=Date.now();
+        const id=++requestId,started=Date.now();let corrections=0,lastCorrection=started;
         lastRequest={index,advance};
         const navigate=()=>{
           if(direction){const button=control(direction>0?'next':'previous');if(!button)throw new Error('The Archive page-turn control is unavailable.');button.click();}
@@ -594,7 +591,16 @@
           if(isIndex(observed))nativeIndex=observed;
           const arrived=nativeIndex===index;
           try{if(arrived&&el&&draw(el,advance))return;}catch{fail('The scan could not be displayed. Retry or return to the Archive.');return;}
-          if(Date.now()-started>15000){fail('This page has not loaded. Retry, or return to the Archive to check your loan or connection. Your last displayed page is kept.');return;}
+          // The native reader can finish an earlier asynchronous scroll after our
+          // request. Correct a missed jump twice, without an endless retry loop.
+          if(!arrived&&Date.now()-lastCorrection>1200&&corrections<2){
+            corrections++;lastCorrection=Date.now();
+            try{selectLeaf(index);}catch(e){fail(e.message);return;}
+          }
+          if(Date.now()-started>15000){
+            fail(arrived?'Archive selected scan '+(index+1)+', but its image has not loaded. Retry, or check the page in Archive.':
+              'Archive did not reach scan '+(index+1)+' (still at scan '+(nativeIndex+1)+'). Retry navigation, or return to Archive.');return;
+          }
           waitTimer=setTimeout(check,200);
         }
         check();
@@ -604,7 +610,7 @@
         if(!bar.hidden){bar.hidden=true;host.focus({preventScroll:true});return;}
         const index=shown+delta;
         if(index<0){say('Beginning of book');return;}
-        const slider=findAll('[aria-label="Page navigation slider"]')[0];
+        const slider=pageSlider();
         const max=Number(slider?.getAttribute('aria-valuemax'));
         if(slider&&Number.isFinite(max)&&index>max){say('End of book');return;}
         // After a cancelled load the underlying reader may be ahead: select the exact leaf.
@@ -686,6 +692,7 @@
       });
       listen(window,'online',()=>{enqueue(syncProgress);if(!error.hidden)retry(false);});
       function toggleControls(){bar.hidden=!bar.hidden;updateUI();}
+      $('.controls-toggle').onclick=toggleControls;
       stage.addEventListener('pointerdown',e=>{
         if(e.pointerType==='mouse'&&e.button!==0)return;
         scrollUserActive=true;

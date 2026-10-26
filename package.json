@@ -4,7 +4,8 @@
     "test": "node tests/regression.cjs",
     "test:layout": "node tests/layout.cjs",
     "test:scroll": "node tests/scroll.cjs",
-    "test:startup": "node tests/startup.cjs"
+    "test:startup": "node tests/startup.cjs",
+    "test:gulag": "node tests/gulag.cjs"
   },
   "devDependencies": {
     "jsdom": "30.1.2",

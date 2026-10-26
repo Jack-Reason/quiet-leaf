@@ -52,7 +52,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    document.querySelector('.book_right').onclick=()=>navigate(fixture.index+1,true);
    document.querySelector('.book_left').onclick=()=>navigate(fixture.index-1,true);
    jQuery('.BRpager').on('slidechange',(event,ui)=>navigate(ui.value));
-   window.addEventListener('BookReader:userAction',()=>fixture.activity++);supply(start);document.querySelector('[aria-valuemax]').setAttribute('aria-valuenow',start);
+   window.addEventListener('BookReader:userAction',()=>fixture.activity++);supply(start);jQuery('.BRpager').slider('value',start);document.querySelector('[aria-valuemax]').setAttribute('aria-valuenow',start);
  },{start,mode,loseOnNavigation});
  await page.addScriptTag({content:fs.readFileSync(path.join(__dirname,'../Quiet-Leaf.user.js'),'utf8')});
  const root=()=>page.locator('#quiet-leaf-reader');
