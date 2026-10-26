@@ -1,14 +1,20 @@
-# Quiet Leaf 0.6.2
+# Quiet Leaf 0.6.3
 
-Original scanned pages, a black backdrop, and no permanent controls. Choose single-page reading or continuous vertical scrolling. For Internet Archive in iPad Safari through the Userscripts extension.
+Original scanned pages, a black backdrop, and a discreet controls button. Choose single-page reading or continuous vertical scrolling. For Internet Archive in iPad Safari through the Userscripts extension.
 
-## Navigation fix
+## Gulag Archipelago loading fix (0.6.3)
 
-Resume and continuous loading now use Archive’s native page slider. You do not need to open its Bookmarks panel.
+Continuous reading now selects exact scans through Archive’s native slider keyboard handler. It no longer resizes the slider and synthesizes a mouse click at a fractional pixel coordinate. The old approach could select the previous scan and leave Quiet Leaf waiting for a page that was never requested. Tests reproduce the 0.6.2 failure at `n9 → n10` using the Gulag volume-one page range; the replacement passes that transition.
+
+The adapter prefers the visible slider, recognises `/page/n…` URLs as well as hash URLs, and supports Archive’s current page-change event index. It corrects a missed native jump at most twice, and distinguishes navigation failures from image-load failures. Volume-specific progress uses Archive’s `subPrefix`, with the volume URL as a fallback when configuration is unavailable. End-of-volume bounds prevent nonexistent scan placeholders.
+
+A small **⋯** button at the top right opens the controls with a mouse or trackpad as well as touch. Mac Safari no longer requires a two-finger touch gesture. The original two-finger and keyboard shortcuts remain available.
+
+For this three-volume item, use **Back to Archive → Viewable files** to choose another volume, then **Read quietly**. Progress is separate for each volume; this release does not concatenate the three PDFs into one scroll strip.
 
 ## Update
 
-Replace `Quiet-Leaf.user.js` in your selected Userscripts folder with this file. Keep only one copy. Open Safari’s Userscripts popup once, then reload the book. The launcher reads **Read quietly · 0.6.2**.
+Replace `Quiet-Leaf.user.js` in your selected Userscripts folder with this file. Keep only one copy. Open Safari’s Userscripts popup once, then reload the book. The launcher reads **Read quietly · 0.6.3**.
 
 If an older version has left a tab stuck, close it and open the book again after replacing the script.
 
@@ -18,7 +24,7 @@ If an older version has left a tab stuck, close it and open the book again after
 2. Open Userscripts and select its scripts folder.
 3. Save `Quiet-Leaf.user.js` in that folder.
 4. Enable Userscripts in Safari and allow it on archive.org.
-5. Open its popup once, reload the Archive book, sign in and borrow normally.
+5. Open its popup once and reload the Archive book. Sign in and borrow when the book requires it; open-access books can be read without borrowing.
 6. Wait for the scan to appear, then tap **Read quietly**.
 
 ## Controls
@@ -26,7 +32,7 @@ If an older version has left a tab stuck, close it and open the book again after
 - In Single page mode, tap the left sixth of the screen: previous page.
 - In Single page mode, tap the remaining five sixths: next page.
 - In Continuous scroll mode, swipe vertically or scroll with a trackpad/mouse; single taps do not turn pages.
-- Two-finger tap, then choose **Reading → Continuous scroll** or **Single page**. Your choice is remembered per book.
+- Tap **⋯** or use a two-finger tap, then choose **Reading → Continuous scroll** or **Single page**. Your choice is remembered per book.
 - Tap with two fingers together: reveal or hide controls.
 - Touch and hold a word: select it using Safari’s native text-selection menu. Available actions (Look Up, Search, Translate, and others) are controlled by iPadOS.
 - **Blue bookmark**: save a native Archive bookmark for the displayed scan.
@@ -106,3 +112,9 @@ The startup and continuous-scroll fixtures use a real jQuery UI slider with the 
 For development tests, run `npm install`, then `npm test` inside this folder. For rendered layout and continuous-scroll tests, run `npx playwright install chromium --only-shell`, then `npm run test:layout`, `npm run test:scroll`, and `npm run test:startup`. The userscript requires no build or dependencies.
 
 Sources: [Internet Archive BookReader](https://github.com/internetarchive/bookreader), [Userscripts](https://github.com/quoid/userscripts).
+
+## Gulag regression coverage
+
+Run `npm run test:gulag` after `npx playwright install chromium webkit` (Linux may also require `npx playwright install-deps`). It runs in Chromium and Playwright WebKit, using the three actual volume page ranges (671, 717 and 579 scans), `n` labels, path URLs, duplicate native sliders, missing initial ARIA values, forward/backward scrolling, progress-safe prefetch, a jump to scan n400, volume identity and the final scan boundary. The fixture models Archive’s custom Left/Right key handler and suppressed programmatic slider changes. `QL_JQUERY_UI=/path/to/jquery-ui.js` lets the same suite run against a downloaded legacy slider implementation; 1.11.1 and the pinned 1.13.3 are both checked for this release. `QL_ENGINE=chromium` runs Chromium alone. `QL_SOURCE=/path/to/old.user.js QL_PROBE=1` limits the run to the initial transition for before/after diagnosis.
+
+These are controlled browser fixtures, not an authenticated live-Archive test or a physical iPad test. They do not validate iPadOS-specific touch gestures or loan renewal. Formal Firefox packaging and device verification remain in the backlog.
