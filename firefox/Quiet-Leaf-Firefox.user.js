@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Quiet Leaf — Internet Archive (Firefox)
 // @namespace    quiet-leaf
-// @version      0.6.4a1
+// @version      0.6.4
 // @description  Single-page or continuous scanned pages, automatic progress, native coloured bookmarks and reading activity.
 // @match        https://archive.org/details/*
 // @match        https://archive.org/stream/*
@@ -248,7 +248,7 @@
     }
 
     const launch=document.createElement('button');
-    launch.id='quiet-leaf-launch';launch.type='button';launch.textContent='Read quietly · Firefox 0.6.4a1';
+    launch.id='quiet-leaf-launch';launch.type='button';launch.textContent='Read quietly · Firefox 0.6.4';
     launch.style.cssText='all:initial!important;position:fixed!important;right:16px!important;bottom:calc(20px + env(safe-area-inset-bottom))!important;z-index:2147483647!important;display:block!important;visibility:visible!important;opacity:1!important;padding:16px 22px!important;background:#28231c!important;color:#fff2da!important;border:1px solid #c8ac7a!important;border-radius:28px!important;font:17px Georgia,serif!important;cursor:pointer!important;box-shadow:0 3px 18px #0005!important;';
     document.documentElement.append(launch);
     let session=null;
@@ -758,6 +758,17 @@
         if(readMode==='scroll'){if(!bar.hidden)bar.hidden=true;return;}
         const r=stage.getBoundingClientRect();turn(e.clientX<r.left+r.width/6?-1:1);
       });
+      // A pointerup on the controls bar never reaches .stage, and capturing the pointer would take
+      // long-press selection from Safari. Drop that touch so the next tap is not stuck as a pinch.
+      function releaseOutside(e){
+        if(!pointers.has(e.pointerId)||e.composedPath().includes(stage))return;
+        if(e.type==='pointercancel'&&gesture&&!multiGesture)lookupActive=true;
+        clearTimeout(lookupHoldTimer);pointers.delete(e.pointerId);
+        if(gesture?.id===e.pointerId)gesture=null;
+        if(multiGesture){multiGesture.valid=false;if(!pointers.size)multiGesture=null;}
+      }
+      listen(root,'pointerup',releaseOutside);listen(root,'pointercancel',releaseOutside);
+      listen(window,'pointerup',releaseOutside);listen(window,'pointercancel',releaseOutside);
       host.addEventListener('keydown',e=>{
         if(e.key!=='Escape'&&e.composedPath()[0].matches?.('input,select,textarea'))return;
         if(readMode==='scroll'&&['ArrowDown','ArrowUp','PageDown','PageUp'].includes(e.key)){e.preventDefault();scrollUserActive=true;stage.scrollBy(0,(e.key==='ArrowUp'||e.key==='PageUp'?-1:1)*stage.clientHeight*.8);return;}

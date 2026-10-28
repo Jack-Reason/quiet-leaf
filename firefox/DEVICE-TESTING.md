@@ -1,21 +1,21 @@
 # Verification record — issue #2
 
-Candidate: **0.6.4a1**. Date prepared: **28 October 2026**. **Android-device verification: NOT RUN.** No supported Android/Firefox/Violentmonkey version combination is claimed yet. Issue #2 remains open, and merging requires the maintainer's testing and approval.
+Candidate: **0.6.4**, generated from the Safari 0.6.4 reader. Date prepared: **28 October 2026**. **Android-device verification: NOT RUN.** No supported Android/Firefox/Violentmonkey version combination is claimed yet. Issue #2 stays open. The maintainer approved merging this package without the Android device test.
 
 ## Automated coverage
 
-Run on macOS 27.0.1 with Node 24.22.1, Playwright 1.51.1 and the pinned dependencies. Package scripts were executed with the bundled pnpm runner or directly through their Node entrypoints; the equivalent npm commands are listed below. The fixture suites use simulated Archive controls, image responses, and bookmark data. They do not connect to a signed-in Archive account or validate a real loan.
+Run on Ubuntu 24.04.5 with Node 22.23.4, npm 10.9.9, Playwright 1.55.1 and the pinned dependencies, using the package scripts. The fixture suites use simulated Archive controls, image responses, and bookmark data. They do not connect to a signed-in Archive account or validate a real loan. Android device testing is still pending, and #2 stays open.
 
 | Check | What it can establish | Result |
 | --- | --- | --- |
-| `npm test` | Shared DOM navigation, activity, progress/bookmark safety, failures, selection gestures and paper preferences; Firefox adapter checks | Pass |
-| `npm run test:layout`, `test:scroll`, `test:startup`, `test:gulag` | Existing Chromium rendering/startup/scroll and Chromium/WebKit three-volume Gulag regressions | Pass: Chromium 134.0.6998.35 and Playwright WebKit 18.4 |
+| `npm test` | Shared DOM navigation, activity, progress/bookmark safety, failures, selection gestures, paper preferences, outside-stage touch release, and Firefox adapter checks | Pass |
+| `npm run test:layout`, `test:scroll`, `test:startup`, `test:gulag` | Existing Chromium rendering/startup/scroll and Chromium/WebKit three-volume Gulag regressions | Pass: Chromium 140.0.7339.186 and Playwright WebKit 26.0 |
 | `npm run check:firefox`, `test:firefox` | Generated file freshness, separate object-realm payloads, index validation | Pass |
-| `npm run test:firefox:browser` | Generated package in desktop Gecko fixtures, including all three volume bounds | Pass: Firefox 135.0 |
-| `npm run test:firefox:manager` with the dependencies described in README | Genuine Violentmonkey execution in desktop Firefox, CSP, both event directions, session cookie, bookmarks/resume, slider/touch/scroll fixtures and final boundary | Pass: Firefox 135.0, Violentmonkey 2.50.0, geckodriver 0.37.1 |
-| Same manager command with `QL_SOURCE=Quiet-Leaf.user.js` | Before/after reproduction against the unchanged 0.6.3 Safari install file | Expected failure reproduced: Firefox denies access to `bookmark` in the fallback event payload; scan-7 resume stays at 0 |
+| `npm run test:firefox:browser` | Generated package in desktop Gecko fixtures, including all three volume bounds and the outside-stage touch release | Pass: Firefox 141.0 |
+| `npm run test:firefox:manager` with the dependencies described in README | Genuine Violentmonkey execution in desktop Firefox, CSP, both event directions, session cookie, bookmarks/resume, slider/touch/scroll fixtures and final boundary | Pass: Firefox 141.0, Violentmonkey 2.50.0, geckodriver 0.37.1 |
+| Same manager command with `QL_SOURCE=Quiet-Leaf.user.js` | Before/after reproduction against the Safari 0.6.4 install file | Expected failure reproduced: Firefox denies access to `bookmark` in the fallback event payload; scan-7 resume stays at 0 |
 
-Violentmonkey XPI SHA256 for this run: `5e074465c7fdd31934e5b4664e3d2eac54269df575a0c0db52c843fe9afd81df`. All browser automation above ran on desktop macOS. Synthetic pointer events and copied text do not verify Android's touch recognizer or native selection menu. The original Safari install file is byte-for-byte identical to main 0.6.3.
+Violentmonkey XPI SHA256 for this run: `5e074465c7fdd31934e5b4664e3d2eac54269df575a0c0db52c843fe9afd81df`. The Safari install file in this package is the 0.6.4 reader from main. Synthetic pointer events and copied text do not verify Android's touch recognizer or native selection menu. Android device testing is still pending, and #2 stays open.
 
 ## Physical Android run — maintainer to complete
 
@@ -28,7 +28,7 @@ Record these values for every tested combination:
 | Android version | Pending |
 | Firefox version/channel | Pending |
 | Violentmonkey version | Pending |
-| Quiet Leaf version and commit | 0.6.4a1 / pending commit |
+| Quiet Leaf version and commit | 0.6.4 / pending commit |
 | Open-access book URLs and volumes | Pending |
 | Borrowed-book URL and normal loan state | Pending |
 
@@ -57,4 +57,4 @@ If a row fails, stop that scenario, note exact reproduction steps and capture th
 
 ## Approval
 
-Maintainer test outcome: **Pending**. Approval to merge: **Not given**. No automatic merge is configured by this work. A real-device failure must be fixed and rechecked before Android support is declared complete.
+Maintainer outcome for the Android device checklist: **Pending**. The maintainer approved merging without that device test. Issue #2 stays open until the checklist passes. A real-device failure must be fixed and rechecked before Android support is declared complete.
