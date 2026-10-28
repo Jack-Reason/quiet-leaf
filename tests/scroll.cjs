@@ -30,31 +30,35 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
      text.innerHTML='<p class="BRparagraphElement" style="left:100px;top:200px;margin-left:100px;margin-top:200px;width:800px;height:40px;font-size:32px"><span class="BRlineElement" style="line-height:40px"><span class="BRwordElement">Librarian</span> <span class="BRwordElement">goblins</span></span></p>';
      el.append(text);document.querySelector('section').replaceChildren(el);
    }
-   function navigate(index,activity=false){
-     if(activity)window.dispatchEvent(new CustomEvent('BookReader:userAction'));
+   function navigate(index){
+     // BookReader.updateFirstIndex emits userAction whenever the visible leaf changes.
      if(index===fixture.index)return;
      fixture.index=index;fixture.nav.push(index);location.hash=`page/n${index}/mode/1up`;
      document.querySelector('[aria-valuemax]').setAttribute('aria-valuenow',index);jQuery('.BRpager').slider('value',index);
      document.querySelector('section').replaceChildren();
      window.dispatchEvent(new CustomEvent('BookReader:pageChanged',{detail:{props:{firstIndex:index}}}));
+     window.dispatchEvent(new CustomEvent('BookReader:userAction'));
      if(!fixture.broken.includes(index))setTimeout(()=>{if(fixture.index===index)supply(index);},80);
    }
    document.querySelector('.onepg').onclick=()=>{};
-   document.querySelector('.book_right').onclick=()=>navigate(fixture.index+1,true);
-   document.querySelector('.book_left').onclick=()=>navigate(fixture.index-1,true);
+   document.querySelector('.book_right').onclick=()=>navigate(fixture.index+1);
+   document.querySelector('.book_left').onclick=()=>navigate(fixture.index-1);
    jQuery('.BRpager').on('slidechange',(event,ui)=>navigate(ui.value));
    window.addEventListener('BookReader:userAction',()=>fixture.activity++);supply(0);
  });
  await page.addScriptTag({content:fs.readFileSync(path.join(__dirname,'../Quiet-Leaf.user.js'),'utf8')});
  const root=()=>page.locator('#quiet-leaf-reader');
- const state=()=>page.evaluate(()=>({progress:JSON.parse(localStorage.getItem('quiet-leaf:v1:test')||'{}'),db:fixture.db,activity:fixture.activity}));
+ const state=()=>page.evaluate(()=>({progress:JSON.parse(localStorage.getItem('quiet-leaf:v1:test')||'{}'),db:fixture.db,activity:fixture.activity,nav:fixture.nav}));
  const loaded=async i=>page.waitForFunction(i=>!!document.querySelector('#quiet-leaf-reader').shadowRoot.querySelector(`.scroll-page[data-index="${i}"] canvas`),i);
  const focused=async i=>page.waitForFunction(i=>document.querySelector('#quiet-leaf-reader').shadowRoot.querySelector('.position').textContent==='Page '+(i+1)&&!document.querySelector('#quiet-leaf-reader').shadowRoot.querySelector('.layout').disabled,i);
  const scroll=async i=>{await loaded(i);await root().locator('.stage').evaluate((el,i)=>{el.dispatchEvent(new WheelEvent('wheel'));el.scrollTop=el.querySelector(`[data-index="${i}"]`).offsetTop;},i);await focused(i);};
  const mode=async value=>root().locator('.layout').evaluate((el,value)=>{el.value=value;el.dispatchEvent(new Event('change'));},value);
  await page.locator('#quiet-leaf-launch').click();await focused(0);
  await mode('scroll');await loaded(1);await page.waitForTimeout(850);
- assert.equal((await state()).progress.farthest,0,'preload must not advance');assert.equal((await state()).activity,0,'preload must not fake reading');
+ const prefetched=await state();
+ assert.equal(prefetched.progress.farthest,0,'prefetch must not advance farthest progress');
+ assert.deepEqual(prefetched.nav,[1],'prefetch selects the next leaf through the slider');
+ assert.equal(prefetched.activity,prefetched.nav.length,'every leaf change emits BookReader:userAction');
  const dimensions=await root().locator('.scroll-page[data-index="0"] canvas').evaluate(el=>({width:el.getBoundingClientRect().width,height:el.getBoundingClientRect().height,viewport:el.getRootNode().querySelector('.stage').clientWidth}));
  assert.equal(dimensions.width,dimensions.viewport);assert.equal(dimensions.height,dimensions.width*1.5);
  await scroll(1);await page.waitForFunction(()=>fixture.db[1]?.color===0&&!fixture.db[0]);
@@ -62,7 +66,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
  await scroll(2);await page.waitForFunction(()=>fixture.db[2]?.color===0&&!fixture.db[1].note.includes('[Quiet Leaf progress v1]'));
  await scroll(1);assert.equal((await state()).progress.farthest,2);assert.equal((await state()).db[1].color,1);
  await root().locator('.resume').evaluate(el=>el.click());await focused(2);
- console.log('PASS width fit, native lazy loading, no preload progress/activity, red progress, blue preservation, backward scroll and resume');
+ console.log('PASS width fit, native lazy loading, prefetch keeps progress and emits slider activity, red progress, blue preservation, backward scroll and resume');
  for(let i=3;i<=8;i++)await scroll(i);
  assert.ok(await root().locator('canvas').count()<=5,'bounded decoded scans');
  const before=await root().locator('.stage').evaluate(el=>({top:el.scrollTop,offset:el.querySelector('[data-index="8"]').offsetTop,height:el.querySelector('[data-index="8"]').offsetHeight}));
