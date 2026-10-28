@@ -1,6 +1,10 @@
-# Quiet Leaf 0.6.3
+# Quiet Leaf 0.6.4
 
 Original scanned pages, a black backdrop, and a discreet controls button. Choose single-page reading or continuous vertical scrolling. For Internet Archive in iPad Safari through the Userscripts extension.
+
+## Stuck touch pointer fix (0.6.4)
+
+A touch that starts on the page and ends on the controls bar no longer leaves a stale pointer. The next tap turns the page again. Arrow keys and the ⋯ button were already unaffected. Pointers are still not captured, so Safari keeps long-press word selection.
 
 ## Gulag Archipelago loading fix (0.6.3)
 
@@ -14,7 +18,7 @@ For this three-volume item, use **Back to Archive → Viewable files** to choose
 
 ## Update
 
-Replace `Quiet-Leaf.user.js` in your selected Userscripts folder with this file. Keep only one copy. Open Safari’s Userscripts popup once, then reload the book. The launcher reads **Read quietly · 0.6.3**.
+Replace `Quiet-Leaf.user.js` in your selected Userscripts folder with this file. Keep only one copy. Open Safari’s Userscripts popup once, then reload the book. The launcher reads **Read quietly · 0.6.4**.
 
 If an older version has left a tab stuck, close it and open the book again after replacing the script.
 
@@ -105,7 +109,7 @@ Runs in Safari’s isolated extension context. No page-script injection, token e
 
 ## Verification and limits
 
-Regression tests cover native navigation without preloaded future pages, activity events without duplicates, the 1:5 tap split, moving red markers, blue collisions, preservation of existing bookmarks and notes, local and remote resume, failed scan recovery, bookmark-service failures, backward progress reset, fullscreen exit during loading, delayed text-layer arrival, text-layer alignment on resize, long-press pass-through, two-finger controls, pinch rejection, and selection dismissal.
+Regression tests cover native navigation without preloaded future pages, activity events without duplicates, the 1:5 tap split, moving red markers, blue collisions, preservation of existing bookmarks and notes, local and remote resume, failed scan recovery, bookmark-service failures, backward progress reset, fullscreen exit during loading, delayed text-layer arrival, text-layer alignment on resize, long-press pass-through, two-finger controls, pinch rejection, selection dismissal, and a touch released outside the stage.
 
 The startup and continuous-scroll fixtures use a real jQuery UI slider with the Bookmarks panel absent and the navigation hidden. Startup tests jump to scan 242 from both earlier and later scans, in both reading modes, including fullscreen loss during navigation. Interaction tests use a simulated DOM. A separate Chromium rendering test compares every test word’s position, size and hit target with its native counterpart in portrait and landscape layouts (1024×1366, 1366×1024 and 768×1366). The continuous-scroll browser fixture tests width fitting, native lazy loading, unchanged farthest progress during prefetch, a `BookReader:userAction` event on every leaf change including slider prefetch, forward/backward bookmarking, memory eviction and reload, rotation, retry, mode switches, saved mode and resume. These tests do not use a physical iPad or authenticated loan. The native iPad selection popup, Safari-specific behaviour, and actual loan renewal still require on-device verification. Archive DOM or API changes can require an adapter update. This reader supports the usual left-to-right navigation. Image quality depends on the native scan resolution. Concurrent edits from multiple devices cannot be made fully atomic through the native bookmark API.
 

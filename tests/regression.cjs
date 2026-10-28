@@ -107,6 +107,19 @@ function fixture({saved=null,bookmarks={},start=0,textDelay=0}={}){
  f.tap(900);await until(()=>f.at(1),'tap still advances after lookup');await until(()=>f.ui.querySelector('.BRwordElement'),'new page selection layer');
  f.click('.exit');assert.equal(f.d.querySelector('#quiet-leaf-reader'),null);assert.ok(f.d.querySelector('.BRtextLayer'));f.close();
  console.log('PASS native text layer, late arrival, resize alignment, long press, two-finger controls, pinch, selection dismissal, and cleanup');
+ // A touch whose pointerup lands outside .stage must not stick and block the next tap.
+ f=fixture();await f.open();
+ f.tap(900);await until(()=>f.at(1),'first tap');
+ f.tap(900);await until(()=>f.at(2),'two taps reach page 3');
+ const outsideStage=f.ui.querySelector('.stage');
+ outsideStage.getBoundingClientRect=()=>({left:0,top:0,width:1200,height:900});
+ const point=(type,target,id,y)=>{const e=new f.w.Event(type,{bubbles:true,composed:true,cancelable:true});Object.assign(e,{clientX:900,clientY:y,pointerId:id,pointerType:'touch',isPrimary:true});target.dispatchEvent(e);};
+ point('pointerdown',outsideStage,4,400);
+ point('pointerup',f.ui.querySelector('.bar'),4,12);
+ assert.ok(f.at(2),'pointerup on the controls bar does not turn the page');
+ f.tap(900);await until(()=>f.at(3),'tap turns after a pointerup outside .stage');
+ f.close();
+ console.log('PASS pointerup outside .stage does not leave a stale touch');
  f=fixture();await f.open();
  const paperFilter=()=>f.host.style.getPropertyValue('--quiet-leaf-paper-filter');
  assert.match(paperFilter(),/saturate/);
