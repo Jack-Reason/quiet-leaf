@@ -1,8 +1,8 @@
 // Real browser layout check: native margin-flow text versus its fullscreen copy.
-const {chromium}=require('playwright');
-const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const {source,engines}=require('./support.cjs');
+const assert=require('node:assert/strict');
 (async()=>{
- const browser=await chromium.launch({headless:true});
+ const browser=await engines()[0].launch({headless:true});
  try{
  const page=await browser.newPage({viewport:{width:1024,height:1366}});
  const svg='<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1800"><rect width="100%" height="100%" fill="#d0b58c"/></svg>';
@@ -25,7 +25,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    window.fetch=async()=>({ok:true,json:async()=>({success:true,value:{}})});
    HTMLElement.prototype.requestFullscreen=()=>Promise.reject(new Error('fixture uses viewport'));
  });
- await page.addScriptTag({content:fs.readFileSync(path.join(__dirname,'../Quiet-Leaf.user.js'),'utf8')});
+ await page.addScriptTag({content:source});
  await page.locator('#quiet-leaf-launch').click();
  await page.waitForFunction(()=>!!document.querySelector('#quiet-leaf-reader')?.shadowRoot.querySelector('.BRwordElement'));
  for(const viewport of [{width:1024,height:1366},{width:1366,height:1024},{width:768,height:1366}]){

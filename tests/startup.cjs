@@ -1,7 +1,7 @@
-const {chromium}=require('playwright');
-const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const {source,engines}=require('./support.cjs');
+const assert=require('node:assert/strict');
 (async()=>{
- const browser=await chromium.launch({headless:true});
+ const browser=await engines()[0].launch({headless:true});
  try{
  for(const mode of ['single','scroll'])for(const start of [0,248])for(const loseOnNavigation of [false,true]){
  const page=await browser.newPage({viewport:{width:820,height:1180}});
@@ -54,7 +54,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    jQuery('.BRpager').on('slidechange',(event,ui)=>navigate(ui.value));
    window.addEventListener('BookReader:userAction',()=>fixture.activity++);supply(start);jQuery('.BRpager').slider('value',start);document.querySelector('[aria-valuemax]').setAttribute('aria-valuenow',start);
  },{start,mode,loseOnNavigation});
- await page.addScriptTag({content:fs.readFileSync(path.join(__dirname,'../Quiet-Leaf.user.js'),'utf8')});
+ await page.addScriptTag({content:source});
  const root=()=>page.locator('#quiet-leaf-reader');
  const focused=i=>page.waitForFunction(i=>document.querySelector('#quiet-leaf-reader')?.shadowRoot.querySelector('.position').textContent==='Page '+(i+1)&&!document.querySelector('#quiet-leaf-reader').shadowRoot.querySelector('.layout').disabled,i);
  await page.locator('#quiet-leaf-launch').click();await focused(242);await page.waitForTimeout(1000);

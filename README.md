@@ -2,6 +2,8 @@
 
 Original scanned pages, a black backdrop, and a discreet controls button. Choose single-page reading or continuous vertical scrolling. For Internet Archive in iPad Safari through the Userscripts extension.
 
+An **Android Firefox / Violentmonkey** package is available separately in [firefox/](firefox/README.md). It is generated from the Safari 0.6.4 reader. Android device testing is still pending, and [#2](https://github.com/Jack-Reason/quiet-leaf/issues/2) stays open; desktop fixtures do not establish Android compatibility. macOS Firefox (#3), iPad Firefox (#4), and the remaining Safari/loan checks (#5) retain their separate scopes.
+
 ## Stuck touch pointer fix (0.6.4)
 
 A touch that starts on the page and ends on the controls bar no longer leaves a stale pointer. The next tap turns the page again. Arrow keys and the ⋯ button were already unaffected. Pointers are still not captured, so Safari keeps long-press word selection.
@@ -121,4 +123,4 @@ Sources: [Internet Archive BookReader](https://github.com/internetarchive/bookre
 
 Run `npm run test:gulag` after `npx playwright install chromium webkit` (Linux may also require `npx playwright install-deps`). It runs in Chromium and Playwright WebKit, using the three actual volume page ranges (671, 717 and 579 scans), `n` labels, path URLs, duplicate native sliders, missing initial ARIA values, forward/backward scrolling, progress-safe prefetch, a jump to scan n400, volume identity and the final scan boundary. The fixture models Archive’s custom Left/Right key handler and suppressed programmatic slider changes. `QL_JQUERY_UI=/path/to/jquery-ui.js` lets the same suite run against a downloaded legacy slider implementation; 1.11.1 and the pinned 1.13.3 are both checked for this release. `QL_ENGINE=chromium` runs Chromium alone. `QL_SOURCE=/path/to/old.user.js QL_PROBE=1` limits the run to the initial transition for before/after diagnosis.
 
-These are controlled browser fixtures, not an authenticated live-Archive test or a physical iPad test. They do not validate iPadOS-specific touch gestures or loan renewal. Formal Firefox packaging and device verification remain in the backlog.
+These are controlled browser fixtures, not an authenticated live-Archive test or a physical iPad test. They do not validate iPadOS-specific touch gestures or loan renewal. Firefox packaging and its separate automated checks are documented in [firefox/README.md](firefox/README.md); Android device verification remains pending.

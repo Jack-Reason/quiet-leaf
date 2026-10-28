@@ -1,6 +1,6 @@
 const {JSDOM}=require('jsdom');
-const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
-const source=fs.readFileSync(path.join(__dirname,'../Quiet-Leaf.user.js'),'utf8');
+const assert=require('node:assert/strict');
+const {source}=require('./support.cjs');
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function until(fn,label='condition',ms=4500){const start=Date.now();while(!fn()){if(Date.now()-start>ms)throw new Error('Timed out: '+label);await sleep(25);}}
 function fixture({saved=null,bookmarks={},start=0,textDelay=0}={}){
