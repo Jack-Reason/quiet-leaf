@@ -1,11 +1,12 @@
-const {chromium,webkit}=require('playwright');
-const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const {source,engines}=require('./support.cjs');
+const assert=require('node:assert/strict');
 (async()=>{
- for(const engine of (process.env.QL_ENGINE==='chromium'?[chromium]:[chromium,webkit])){
+ for(const engine of engines(['chromium','webkit'])){
  const browser=await engine.launch({headless:true});
  try{
  for(const [volume,max] of [['The-Gulag-Archipelago__vol1__I-II__Solzhenitsyn',670],['The-Gulag-Archipelago__vol2__III-IV__Solzhenitsyn',716],['The-Gulag-Archipelago__vol3__V-VII__Solzhenitsyn',578]]){
  const page=await browser.newPage({viewport:{width:820,height:1180}});
+ page.setDefaultTimeout(15000);
  await page.route('**/*',route=>route.fulfill({contentType:'text/html',body:`<style>body{margin:0}.BRpagecontainer{position:relative;width:600px}.BRpageimage{width:100%;display:block}.BRtextLayer{position:absolute;left:0;top:0;transform-origin:0 0;color:transparent}.BRparagraphElement{margin:0;font-family:Georgia,serif;line-height:0}.BRlineElement{display:inline-block;white-space:nowrap;pointer-events:all}.BRtextLayer[dir=ltr] .BRlineElement{margin-right:100%}</style><button class="BRicon onepg"></button><button class="BRicon book_right"></button><button class="BRicon book_left"></button><div style="display:none"><div class="BRpager"></div></div><div class="BRpager"></div><section></section>`}));
  const identifier='TheGulagArchipelago-Threevolumes/'+volume;
  await page.goto('https://archive.org/details/'+identifier+'/page/n9/mode/1up');
@@ -58,16 +59,22 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    jQuery('.BRpager').on('slidechange',(event,ui)=>{const rail=jQuery(event.target);if(rail.data('swallowchange'))rail.data('swallowchange',false);else navigate(ui.value);});
    window.addEventListener('BookReader:userAction',()=>fixture.activity++);supply(9);
  },identifier);
- await page.addScriptTag({content:fs.readFileSync(process.env.QL_SOURCE||path.join(__dirname,'../Quiet-Leaf.user.js'),'utf8')});
+ await page.addScriptTag({content:source});
  const root=()=>page.locator('#quiet-leaf-reader');
  const state=()=>page.evaluate(id=>({progress:JSON.parse(localStorage.getItem('quiet-leaf:v1:'+id)||'{}'),db:fixture.db,activity:fixture.activity,nav:fixture.nav}),identifier);
  const loaded=async i=>{
    try{await page.waitForFunction(i=>!!document.querySelector('#quiet-leaf-reader').shadowRoot.querySelector(`.scroll-page[data-index="${i}"] canvas`),i);}
    catch(e){console.error(await page.evaluate(()=>({native:fixture.index,nav:fixture.nav,slider:jQuery('.BRpager').map(function(){return jQuery(this).slider('value');}).get(),error:document.querySelector('#quiet-leaf-reader').shadowRoot.querySelector('.error').textContent,mouseX:new MouseEvent('mousedown',{clientX:1000*10/670,button:0,buttons:1}).clientX})));throw e;}
  };
- const focused=async i=>page.waitForFunction(i=>document.querySelector('#quiet-leaf-reader').shadowRoot.querySelector('.position').textContent==='Page n'+i&&!document.querySelector('#quiet-leaf-reader').shadowRoot.querySelector('.layout').disabled,i);
+ const focused=async i=>page.waitForFunction(i=>document.querySelector('#quiet-leaf-reader')?.shadowRoot.querySelector('.position').textContent==='Page n'+i&&!document.querySelector('#quiet-leaf-reader').shadowRoot.querySelector('.layout').disabled,i);
+ const open=async()=>{
+   // Exiting can leave Archive finishing a native prefetch. As in the install
+   // instructions, wait for its scan before activating, particularly in Gecko.
+   await page.waitForFunction(()=>{const img=document.querySelector('section img.BRpageimage');return img?.complete&&img.naturalWidth;});
+   await page.locator('#quiet-leaf-launch').click();
+ };
  const scroll=async i=>{await loaded(i);await root().locator('.stage').evaluate((el,i)=>{el.dispatchEvent(new WheelEvent('wheel'));el.scrollTop=el.querySelector(`[data-index="${i}"]`).offsetTop;},i);await focused(i);};
-  await page.locator('#quiet-leaf-launch').click();await focused(9);
+ await open();await focused(9);
  await loaded(10);if(process.env.QL_PROBE){console.log('PASS initial n9 to n10 prefetch');await page.close();continue;}assert.equal((await state()).progress.farthest,9,'prefetch is not progress');
  for(let index=10;index<=15;index++)await scroll(index);
  assert.equal((await state()).progress.farthest,15);
@@ -77,12 +84,12 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
  // Saved resume jumps far ahead and back without loading intermediate scans.
  await root().locator('.exit').evaluate(el=>el.click());
  await page.evaluate(()=>{fixture.db[400]={color:0,note:'[Quiet Leaf progress v1]'};});
- await page.locator('#quiet-leaf-launch').click();await focused(400);await loaded(401);
+ await open();await focused(400);await loaded(401);
  assert.equal((await state()).progress.farthest,400);
  assert.equal((await state()).nav.includes(200),false,'no intermediate page request during keyboard jump');
  await root().locator('.exit').evaluate(el=>el.click());
  await page.evaluate(max=>{fixture.db[max]={color:0,note:'[Quiet Leaf progress v1]'};},max);
- await page.locator('#quiet-leaf-launch').click();await focused(max);
+ await open();await focused(max);
  assert.equal(await root().locator('.scroll-page[data-index="'+(max+1)+'"]').count(),0,'no phantom page beyond volume');
  await root().locator('.exit').evaluate(el=>el.click());
  // Same item, different volumes must retain different storage and bookmark IDs.

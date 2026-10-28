@@ -1,7 +1,7 @@
-const {chromium}=require('playwright');
-const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const {source,engines}=require('./support.cjs');
+const assert=require('node:assert/strict');
 (async()=>{
- const browser=await chromium.launch({headless:true});
+ const browser=await engines()[0].launch({headless:true});
  try{
  const page=await browser.newPage({viewport:{width:820,height:1180}});
  await page.route('**/*',route=>route.fulfill({contentType:'text/html',body:`<style>body{margin:0}.BRpagecontainer{position:relative;width:600px}.BRpageimage{width:100%;display:block}.BRtextLayer{position:absolute;left:0;top:0;transform-origin:0 0;color:transparent}.BRparagraphElement{margin:0;font-family:Georgia,serif;line-height:0}.BRlineElement{display:inline-block;white-space:nowrap;pointer-events:all}.BRtextLayer[dir=ltr] .BRlineElement{margin-right:100%}</style><button class="BRicon onepg"></button><button class="BRicon book_right"></button><button class="BRicon book_left"></button><div style="display:none"><div class="BRpager"></div></div><section></section>`}));
@@ -46,7 +46,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    jQuery('.BRpager').on('slidechange',(event,ui)=>navigate(ui.value));
    window.addEventListener('BookReader:userAction',()=>fixture.activity++);supply(0);
  });
- await page.addScriptTag({content:fs.readFileSync(path.join(__dirname,'../Quiet-Leaf.user.js'),'utf8')});
+ await page.addScriptTag({content:source});
  const root=()=>page.locator('#quiet-leaf-reader');
  const state=()=>page.evaluate(()=>({progress:JSON.parse(localStorage.getItem('quiet-leaf:v1:test')||'{}'),db:fixture.db,activity:fixture.activity,nav:fixture.nav}));
  const loaded=async i=>page.waitForFunction(i=>!!document.querySelector('#quiet-leaf-reader').shadowRoot.querySelector(`.scroll-page[data-index="${i}"] canvas`),i);

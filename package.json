@@ -1,11 +1,16 @@
 {
   "private": true,
   "scripts": {
-    "test": "node tests/regression.cjs",
+    "test": "node tests/regression.cjs && node firefox/tests/adapter.cjs",
     "test:layout": "node tests/layout.cjs",
     "test:scroll": "node tests/scroll.cjs",
     "test:startup": "node tests/startup.cjs",
-    "test:gulag": "node tests/gulag.cjs"
+    "test:gulag": "node tests/gulag.cjs",
+    "build:firefox": "node firefox/build.cjs",
+    "check:firefox": "node firefox/build.cjs --check",
+    "test:firefox": "node firefox/tests/adapter.cjs",
+    "test:firefox:browser": "node firefox/tests/browser.cjs",
+    "test:firefox:manager": "node firefox/tests/manager.cjs"
   },
   "devDependencies": {
     "jsdom": "30.1.2",
