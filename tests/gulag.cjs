@@ -98,6 +98,62 @@ const assert=require('node:assert/strict');
  console.log(`PASS ${engine.name()} ${volume}: n9→n15, path fallback, two sliders, prefetch/progress, controls, resume n400`);
  await page.close();
  }
+ const rtl=await browser.newPage({viewport:{width:820,height:1180}});
+ rtl.setDefaultTimeout(15000);
+ await rtl.route('**/*',route=>route.fulfill({contentType:'text/html',body:'<button class="BRicon onepg"></button><button class="BRicon book_right"></button><button class="BRicon book_left"></button><div class="BRpager"></div><section></section>'}));
+ await rtl.goto('https://archive.org/details/rtl-book#page/n0/mode/1up');
+ await rtl.addScriptTag({path:require.resolve('jquery/dist/jquery.js')});
+ await rtl.addScriptTag({path:require.resolve('jquery-ui-dist/jquery-ui.js')});
+ await rtl.evaluate(()=>{
+  const config=document.createElement('input');config.className='js-bookreader';config.type='hidden';
+  config.value=JSON.stringify({pageProgression:'rl',url:'https://archive.org/BookReader/BookReaderJSIA.php?subPrefix=rtl-book'});
+  document.body.append(config);
+  jQuery('.BRpager').slider({min:0,max:12,value:0});
+  jQuery('.ui-slider-handle').attr({'aria-label':'Page navigation slider','aria-valuemin':0,'aria-valuemax':12,'aria-valuenow':0});
+  window.fixture={index:0,db:{4:{color:0,note:'[Quiet Leaf progress v1]'}},keys:[],nav:[]};
+  window.fetch=async(url,options)=>{
+   const index=new URL(url).searchParams.get('page_num');
+   if(options.method==='POST')fixture.db[index]=JSON.parse(options.body).notes;
+   if(options.method==='DELETE')delete fixture.db[index];
+   return {ok:true,json:async()=>({success:true,value:Object.fromEntries(Object.entries(fixture.db).map(([i,notes])=>[i,{notes}]))})};
+  };
+  function supply(index){
+   const el=document.createElement('div');el.className='BRpagecontainer';el.dataset.index=index;el.dataset.pageNum='n'+index;
+   const img=document.createElement('img');img.className='BRpageimage';
+   img.src='data:image/svg+xml;base64,'+btoa('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900"><rect width="100%" height="100%" fill="#cfb990"/></svg>');
+   el.append(img);document.querySelector('section').replaceChildren(el);
+  }
+  function navigate(index){
+   if(index===fixture.index)return;
+   fixture.index=index;fixture.nav.push(index);history.replaceState(null,'','/details/rtl-book/page/n'+index+'/mode/1up');
+   jQuery('.ui-slider-handle').attr('aria-valuenow',index);
+   jQuery('.BRpager').data('swallowchange',true).slider('value',index);
+   document.querySelector('section').replaceChildren();
+   window.dispatchEvent(new CustomEvent('BookReader:pageChanged',{detail:{props:{index}}}));
+   setTimeout(()=>{if(fixture.index===index)supply(index);},40);
+  }
+  document.querySelector('.onepg').onclick=()=>{};
+  jQuery('.ui-slider-handle').off('keydown').on('keydown',event=>{
+   if(event.keyCode===37||event.keyCode===39){
+    fixture.keys.push(event.key);
+    event.keyCode=event.keyCode===37?39:37;
+    jQuery.ui.slider.prototype._handleEvents.keydown.call(jQuery(event.target).parent().data('ui-slider'),event);
+    event.stopPropagation();
+   }
+  });
+  jQuery('.BRpager').on('slide',(_,ui)=>jQuery('.ui-slider-handle').attr('aria-valuenow',ui.value));
+  jQuery('.BRpager').on('slidechange',(event,ui)=>{const rail=jQuery(event.target);if(rail.data('swallowchange'))rail.data('swallowchange',false);else navigate(ui.value);});
+  supply(0);
+ });
+ await rtl.addScriptTag({content:source});
+ await rtl.waitForFunction(()=>{const img=document.querySelector('img.BRpageimage');return img?.complete&&img.naturalWidth;});
+ await rtl.locator('#quiet-leaf-launch').click();
+ await rtl.waitForFunction(()=>document.querySelector('#quiet-leaf-reader')?.shadowRoot.querySelector('.position').textContent==='Page n4');
+ const rtlKeys=await rtl.evaluate(()=>fixture.keys);
+ assert.deepEqual(rtlKeys,['ArrowLeft','ArrowLeft','ArrowLeft','ArrowLeft']);
+ assert.equal(await rtl.evaluate(()=>fixture.index),4);
+ console.log(`PASS ${engine.name()} right-to-left slider inverts BookReader’s Left/Right swap`);
+ await rtl.close();
  }finally{await browser.close();}
  }
 })().catch(e=>{console.error(e);process.exit(1);});

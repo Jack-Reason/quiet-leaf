@@ -9,6 +9,10 @@ assert.equal(source, build(), 'Generated userscript is stale');
 new vm.Script(source);
 assert.match(source, /@inject-into\s+content/);
 assert.match(source, /@grant\s+none/);
+assert.match(source, /@version\s+0\.6\.5/);
+assert.match(source, /firefoxBookmarkEvent\(index\)/);
+assert.match(source, /firefoxPageIndex\(e\)/);
+assert.doesNotMatch(source, /detail:\{bookmark:\{id:index,leafNum:index\}\}/);
 assert.doesNotMatch(source, /@require\s|@connect\s|@grant\s+GM/);
 
 // A second realm catches accidentally nested content-owned object literals.

@@ -6,6 +6,7 @@
     "test:scroll": "node tests/scroll.cjs",
     "test:startup": "node tests/startup.cjs",
     "test:gulag": "node tests/gulag.cjs",
+    "test:origin": "node tests/origin.cjs",
     "build:firefox": "node firefox/build.cjs",
     "check:firefox": "node firefox/build.cjs --check",
     "test:firefox": "node firefox/tests/adapter.cjs",

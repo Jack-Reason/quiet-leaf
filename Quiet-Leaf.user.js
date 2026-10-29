@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Quiet Leaf — Internet Archive
 // @namespace    quiet-leaf
-// @version      0.6.4
+// @version      0.6.5
 // @description  Single-page or continuous scanned pages, automatic progress, native coloured bookmarks and reading activity.
 // @match        https://archive.org/details/*
 // @match        https://archive.org/stream/*
@@ -34,27 +34,39 @@
     const index=value?Number(value[1]):null;
     return isIndex(index)?index:null;
   }
+  function pageLabel() {
+    const raw=(location.hash||location.pathname).match(/(?:^#|\/)page\/([^/?#]+)/)?.[1]||'';
+    if(!raw)return '';
+    try{return decodeURIComponent(raw);}catch{return '';}
+  }
+  function pageByLabel(label=pageLabel()) {
+    if(!label)return null;
+    return pages().find(el=>el.dataset.pageNum===label)||null;
+  }
+  // A printed leaf such as /page/27 is not a scan index. Use the slider, then
+  // an explicit /page/n index, then the loaded container that carries that label.
+  function readerIndex() {
+    const slider=pageSlider(),value=slider?.getAttribute('aria-valuenow');
+    if(value!==null&&value!==undefined&&value!==''){const n=Number(value);if(isIndex(n))return n;}
+    const fromUrl=urlIndex();
+    if(isIndex(fromUrl))return fromUrl;
+    const named=pageByLabel();
+    const index=named?Number(named.dataset.index):null;
+    return isIndex(index)?index:null;
+  }
   function pageSlider() {
     const sliders=findAll('[aria-label="Page navigation slider"]');
     // Prefer the visible control; both native controls remain keyboard-operable
     // when Archive hides its navigation. Never change their layout to navigate.
     return sliders.find(el=>el.getClientRects().length&&getComputedStyle(el).visibility!=='hidden')||sliders[0];
   }
-  function readerIndex() {
-    const slider=pageSlider(),value=slider?.getAttribute('aria-valuenow');
-    if(value!==null&&value!==undefined){const n=Number(value);if(isIndex(n))return n;}
-    return urlIndex();
-  }
   function currentPage() {
     const all = pages();
     const hash = readerIndex();
     const exact = all.find(el => isIndex(hash) && Number(el.dataset.index) === hash);
     if (exact) return exact;
-    const label = (location.hash || location.pathname).match(/(?:^#|\/)page\/([^/]+)/)?.[1];
-    if (label) {
-      const named = all.find(el => el.dataset.pageNum === decodeURIComponent(label));
-      if (named) return named;
-    }
+    const named = pageByLabel();
+    if (named) return named;
     const visible = all.filter(el => {
       const r = el.getBoundingClientRect();
       return r.width && r.height && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth;
@@ -72,15 +84,73 @@
     };
     return findAll(selectors[kind]).find(el => !el.disabled && el.getAttribute('aria-disabled') !== 'true');
   }
+  function safeToken(value) {
+    if(typeof value!=='string'||!value)return '';
+    let text=value;
+    if(text.includes('%')){try{text=decodeURIComponent(text);}catch{return '';}}
+    if(/[\\?#\u0000]/.test(text))return '';
+    const segments=text.split('/');
+    if(segments.some(part=>part===''||part==='.'||part==='..'))return '';
+    return text;
+  }
   function bookIdentifier() {
     const parts = location.pathname.split('/').filter(Boolean);
-    const id = decodeURIComponent(parts[1] || '');
-    let sub = parts[2]&&!['page','mode','search'].includes(parts[2])?decodeURIComponent(parts[2]):id;
+    const id = safeToken(parts[1] || '');
+    let sub = parts[2]&&!['page','mode','search'].includes(parts[2])?safeToken(parts[2]):id;
+    if(!sub)sub=id;
     try {
       const options = JSON.parse(document.querySelector('input.js-bookreader')?.value || '{}');
-      sub = new URL(options.url, location.href).searchParams.get('subPrefix') || sub;
+      const prefix = safeToken(new URL(options.url, location.href).searchParams.get('subPrefix') || '');
+      if(prefix)sub=prefix;
     } catch {}
+    if(!id)return sub;
     return sub === id ? id : id + '/' + sub;
+  }
+  function copyTextLayer(source) {
+    const drop=new Set(['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','IMG','SVG','MATH','LINK','AUDIO','VIDEO','CANVAS','FORM','INPUT','BUTTON','TEXTAREA','SELECT','META','BASE','NOSCRIPT','TEMPLATE','FRAME','APPLET','FOREIGNOBJECT']);
+    const allow=new Set(['DIV','P','SPAN','BR']);
+    const classes=new Set(['BRPageLayer','BRtextLayer','BRparagraphElement','BRlineElement','BRwordElement','BRwordElement--hyphen']);
+    const props=['width','height','left','top','right','bottom','margin','margin-left','margin-top','margin-right','margin-bottom','font-size','line-height','font-family','letter-spacing','word-spacing','text-indent','white-space'];
+    const html='http://www.w3.org/1999/xhtml';
+    function styleOf(el){
+      const parts=[];
+      for(const prop of props){
+        const value=el.style.getPropertyValue(prop);
+        if(!value||value.length>120||/url\(|expression|javascript|@import|var\(|<|>|\\/i.test(value))continue;
+        parts.push(prop+':'+value);
+      }
+      return parts.join(';');
+    }
+    function copy(node){
+      if(node.nodeType===3)return node.textContent?document.createTextNode(node.textContent):null;
+      if(node.nodeType!==1)return null;
+      if(node.namespaceURI&&node.namespaceURI!==html)return null;
+      const tag=node.tagName.toUpperCase();
+      if(drop.has(tag))return null;
+      if(!allow.has(tag)){
+        const frag=document.createDocumentFragment();
+        for(const child of node.childNodes){const next=copy(child);if(next)frag.append(next);}
+        return frag;
+      }
+      const el=document.createElement(tag.toLowerCase());
+      const kept=[...node.classList].filter(name=>classes.has(name));
+      if(kept.length)el.className=kept.join(' ');
+      const style=styleOf(node);
+      if(style)el.setAttribute('style',style);
+      const dir=node.getAttribute('dir');
+      if(dir==='ltr'||dir==='rtl')el.setAttribute('dir',dir);
+      if(tag!=='BR'){for(const child of node.childNodes){const next=copy(child);if(next)el.append(next);}}
+      return el;
+    }
+    return copy(source);
+  }
+  function rightToLeft() {
+    try {
+      const options=JSON.parse(document.querySelector('input.js-bookreader')?.value||'{}');
+      if(options.pageProgression==='rl')return true;
+      if(options.pageProgression==='lr')return false;
+    } catch {}
+    return findAll('.book_left, button.book_left').some(el=>el.classList.contains('book_flip_next'));
   }
   const tagged = b => !!b && b.note.split('\n').some(line=>line===MARK||line===KEEP_MARK);
   const untag = note => note.split('\n').filter(line => line !== MARK && line !== KEEP_MARK).join('\n');
@@ -223,7 +293,7 @@
     }
 
     const launch=document.createElement('button');
-    launch.id='quiet-leaf-launch';launch.type='button';launch.textContent='Read quietly · 0.6.4';
+    launch.id='quiet-leaf-launch';launch.type='button';launch.textContent='Read quietly · 0.6.5';
     launch.style.cssText='all:initial!important;position:fixed!important;right:16px!important;bottom:calc(20px + env(safe-area-inset-bottom))!important;z-index:2147483647!important;display:block!important;visibility:visible!important;opacity:1!important;padding:16px 22px!important;background:#28231c!important;color:#fff2da!important;border:1px solid #c8ac7a!important;border-radius:28px!important;font:17px Georgia,serif!important;cursor:pointer!important;box-shadow:0 3px 18px #0005!important;';
     document.documentElement.append(launch);
     let session=null;
@@ -361,17 +431,11 @@
           if(!source?.querySelector('.BRwordElement'))return;
           const w=parseFloat(source.style.width),h=parseFloat(source.style.height);
           if(!(w>0&&h>0))return;
-          const layer=source.cloneNode(true);
-          layer.removeAttribute('id');layer.removeAttribute('aria-hidden');
-          layer.setAttribute('dir',source.getAttribute('dir')||getComputedStyle(source).direction||'ltr');
+          const layer=copyTextLayer(source);
+          if(!layer)return;
+          layer.setAttribute('dir',layer.getAttribute('dir')||source.getAttribute('dir')||getComputedStyle(source).direction||'ltr');
           layer.style.display='block';layer.style.visibility='visible';layer.style.opacity='1';
           layer.style.pointerEvents='none';layer.style.color='transparent';
-          // Strip interactive annotation wrappers/attributes; keep native word geometry.
-          for(const node of layer.querySelectorAll('*')){
-            node.removeAttribute('id');node.removeAttribute('tabindex');node.removeAttribute('contenteditable');
-            for(const attr of [...node.attributes])if(attr.name.startsWith('on'))node.removeAttribute(attr.name);
-          }
-          layer.querySelectorAll('script,style,iframe,button,audio,video').forEach(n=>n.remove());
           container.querySelector('.BRtextLayer')?.remove();container.append(layer);attached=true;fitTextLayer();stopTextWatch(container);
         };
         attach();
@@ -416,7 +480,9 @@
         const img=imageOf(el);
         if(!img?.complete || !img.naturalWidth || !img.naturalHeight)return false;
         const canvas=document.createElement('canvas');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
-        canvas.getContext('2d').drawImage(img,0,0);canvas.setAttribute('role','img');
+        try{canvas.getContext('2d').drawImage(img,0,0);}
+        catch{throw new Error('Archive’s scan could not be copied into the reader. Retry, or return to Archive.');}
+        canvas.setAttribute('role','img');
         const index=Number(el.dataset.index),label=el.dataset.pageNum||String(index+1);
         canvas.setAttribute('aria-label','Scanned page '+label);
         if(readMode==='scroll')return acceptScrollPage(el,canvas,index,label);
@@ -450,7 +516,10 @@
         // BookReader exposes Left/Right to jQuery UI. Repeated keydowns followed
         // by ONE keyup select an exact leaf and commit ONE jump. Mouse coordinates
         // can round to a neighbouring leaf, especially in long volumes on Safari.
-        const key=index>now?'ArrowRight':'ArrowLeft',keyCode=index>now?39:37;
+        // For pageProgression rl, BookReader swaps Left and Right before that
+        // handler. Send the opposite key so the leaf index still moves forward.
+        const increase=rightToLeft()?index<now:index>now;
+        const key=increase?'ArrowRight':'ArrowLeft',keyCode=increase?39:37;
         const options={key,code:key,keyCode,which:keyCode,bubbles:true,cancelable:true,view:window};
         for(let step=0;step<steps;step++)handle.dispatchEvent(new KeyboardEvent('keydown',options));
         handle.dispatchEvent(new KeyboardEvent('keyup',options));
@@ -590,7 +659,7 @@
           const observed=readerIndex();
           if(isIndex(observed))nativeIndex=observed;
           const arrived=nativeIndex===index;
-          try{if(arrived&&el&&draw(el,advance))return;}catch{fail('The scan could not be displayed. Retry or return to the Archive.');return;}
+          try{if(arrived&&el&&draw(el,advance))return;}catch(e){fail(e instanceof Error&&e.message?e.message:'The scan could not be displayed. Retry or return to the Archive.');return;}
           // The native reader can finish an earlier asynchronous scroll after our
           // request. Correct a missed jump twice, without an endless retry loop.
           if(!arrived&&Date.now()-lastCorrection>1200&&corrections<2){
@@ -616,6 +685,14 @@
         // After a cancelled load the underlying reader may be ahead: select the exact leaf.
         requestPage(index,{direction:nativeIndex===shown?delta:0,activity:true});
       }
+      async function awaitNative(index,ticket,ms){
+        const start=Date.now();
+        while(!closed&&ticket===requestId&&nativeIndex!==index&&Date.now()-start<ms){
+          await delay(80);
+          const observed=readerIndex();if(isIndex(observed))nativeIndex=observed;
+        }
+        return !closed&&ticket===requestId&&nativeIndex===index;
+      }
       async function retry(userInitiated=true){
         const request=lastRequest;
         if(!request || closed)return;
@@ -625,20 +702,30 @@
         // BookReader ignores a jump to its current index. If that scan failed, briefly
         // navigate away and back through native selection to request it again. Never
         // display or record the intermediate leaf, and never rewrite signed image URLs.
+        // Confirm the return. If it misses, select the failed leaf again so Archive
+        // is not left on the neighbour.
         if(nativeIndex===index && (!img?.complete || !img.naturalWidth)){
           const ticket=++requestId;
           waiting=true;error.hidden=true;updateUI();
           const neighbour=index>0?index-1:index+1;
+          const jump=target=>selectLeaf(target);
           try{
-            userInitiated?signalActivity(()=>selectLeaf(neighbour)):selectLeaf(neighbour);
-            const start=Date.now();
-            while(!closed && ticket===requestId && nativeIndex!==neighbour && Date.now()-start<2500){
-              await delay(80);
-              const observed=readerIndex();if(isIndex(observed))nativeIndex=observed;
+            userInitiated?signalActivity(()=>jump(neighbour)):jump(neighbour);
+            if(!(await awaitNative(neighbour,ticket,2500))){
+              if(!closed&&ticket===requestId)fail('The Archive could not restart this page. Return to it to check your loan.');
+              return;
             }
-            if(closed || ticket!==requestId)return;
-            if(nativeIndex!==neighbour){fail('The Archive could not restart this page. Return to it to check your loan.');return;}
-            loadNativePage(index,{force:true,advance:request.advance});
+            jump(index);
+            if(!(await awaitNative(index,ticket,2500))){
+              if(closed||ticket!==requestId)return;
+              jump(index);
+              if(!(await awaitNative(index,ticket,2500))){
+                if(!closed&&ticket===requestId)fail('The Archive could not return to this page. Return to it to check your loan.');
+                return;
+              }
+            }
+            if(closed||ticket!==requestId)return;
+            loadNativePage(index,{advance:request.advance});
           }catch(e){fail(e.message);}
         }else loadNativePage(index,{force:true,activity:userInitiated,advance:request.advance});
       }
@@ -744,7 +831,24 @@
       }
       listen(root,'pointerup',releaseOutside);listen(root,'pointercancel',releaseOutside);
       listen(window,'pointerup',releaseOutside);listen(window,'pointercancel',releaseOutside);
+      function focusableControls(){
+        return [...root.querySelectorAll('button, input, select, textarea')].filter(el=>{
+          if(el.disabled||el.closest('[hidden]'))return false;
+          const style=getComputedStyle(el);
+          return style.display!=='none'&&style.visibility!=='hidden';
+        });
+      }
       host.addEventListener('keydown',e=>{
+        if(e.key==='Tab'){
+          const items=focusableControls();
+          e.preventDefault();
+          if(!items.length){host.focus({preventScroll:true});return;}
+          const current=e.composedPath()[0];
+          const index=items.indexOf(current);
+          const next=e.shiftKey?(index<=0?items[items.length-1]:items[index-1]):(index<0||index===items.length-1?items[0]:items[index+1]);
+          next.focus({preventScroll:true});
+          return;
+        }
         if(e.key!=='Escape'&&e.composedPath()[0].matches?.('input,select,textarea'))return;
         if(readMode==='scroll'&&['ArrowDown','ArrowUp','PageDown','PageUp'].includes(e.key)){e.preventDefault();scrollUserActive=true;stage.scrollBy(0,(e.key==='ArrowUp'||e.key==='PageUp'?-1:1)*stage.clientHeight*.8);return;}
         if(e.key==='Escape'){e.preventDefault();exit();}

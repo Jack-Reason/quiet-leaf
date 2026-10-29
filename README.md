@@ -1,8 +1,18 @@
-# Quiet Leaf 0.6.4
+# Quiet Leaf 0.6.5
 
 Original scanned pages, a black backdrop, and a discreet controls button. Choose single-page reading or continuous vertical scrolling. For Internet Archive in iPad Safari through the Userscripts extension.
 
-An **Android Firefox / Violentmonkey** package is available separately in [firefox/](firefox/README.md). It is generated from the Safari 0.6.4 reader. Android device testing is still pending, and [#2](https://github.com/Jack-Reason/quiet-leaf/issues/2) stays open; desktop fixtures do not establish Android compatibility. macOS Firefox (#3), iPad Firefox (#4), and the remaining Safari/loan checks (#5) retain their separate scopes.
+Firefox uses a generated package in [firefox/](firefox/README.md). macOS Firefox installs that package through Violentmonkey; the automated stand-in is Playwright Firefox, and no physical Mac was used ([firefox/macos](firefox/macos/README.md)). Firefox on iPad cannot run Quiet Leaf; the blocker is recorded in [firefox/ipad](firefox/ipad/README.md) and support stays unavailable. Android Firefox uses the same package. Physical Android testing was dropped with issue #2. Desktop fixtures do not by themselves establish a device. Remaining Safari and loan checks stay in #5.
+
+## Fixes in 0.6.5
+
+The text layer copied into the reader is rebuilt from an allowlist of `div`, `p`, `span` and `br` elements, the BookReader text classes, `dir`, and geometric inline styles. Links, scripts, frames, objects, images and event-handler attributes in Archive’s layer are not copied. Word geometry for the allowed nodes stays.
+
+Retrying a scan Archive has already selected still steps to a neighbouring leaf and back, because BookReader ignores a second jump to the current leaf. The return is confirmed. If it misses, Quiet Leaf selects the failed leaf again before showing an error, so Archive is not left on the neighbour. At the first leaf the neighbour is the next leaf.
+
+Tab and Shift+Tab stay on the visible controls inside the reader dialog. Closing the reader, including with Escape, returns focus to **Read quietly**.
+
+Bookmark identifiers drop a `subPrefix` or path segment of `.` or `..`, including a percent-encoded `..`, and fall back to the item id. A normal volume prefix such as `vol1` is unchanged. Right-to-left books (`pageProgression: rl`) send the opposite slider key, because BookReader swaps Left and Right before jQuery UI moves the handle; the leaf index still increases when moving forward. A printed URL such as `/page/27` is not treated as leaf 27. When the slider has no `aria-valuenow`, Quiet Leaf uses the loaded container’s `data-index` for that label. If the browser refuses to copy a cross-origin scan onto the canvas, the reader shows a recoverable error and keeps the last successful page. It never reads pixels back.
 
 ## Stuck touch pointer fix (0.6.4)
 
@@ -20,7 +30,7 @@ For this three-volume item, use **Back to Archive → Viewable files** to choose
 
 ## Update
 
-Replace `Quiet-Leaf.user.js` in your selected Userscripts folder with this file. Keep only one copy. Open Safari’s Userscripts popup once, then reload the book. The launcher reads **Read quietly · 0.6.4**.
+Replace `Quiet-Leaf.user.js` in your selected Userscripts folder with this file. Keep only one copy. Open Safari’s Userscripts popup once, then reload the book. The launcher reads **Read quietly · 0.6.5**.
 
 If an older version has left a tab stuck, close it and open the book again after replacing the script.
 
@@ -111,11 +121,15 @@ Runs in Safari’s isolated extension context. No page-script injection, token e
 
 ## Verification and limits
 
-Regression tests cover native navigation without preloaded future pages, activity events without duplicates, the 1:5 tap split, moving red markers, blue collisions, preservation of existing bookmarks and notes, local and remote resume, failed scan recovery, bookmark-service failures, backward progress reset, fullscreen exit during loading, delayed text-layer arrival, text-layer alignment on resize, long-press pass-through, two-finger controls, pinch rejection, selection dismissal, and a touch released outside the stage.
+Regression tests cover native navigation without preloaded future pages, activity events without duplicates, the 1:5 tap split, moving red markers, blue collisions, preservation of existing bookmarks and notes, local and remote resume, failed scan recovery, a retry whose return jump misses once, bookmark-service failures, backward progress reset, fullscreen exit during loading, delayed text-layer arrival, text-layer alignment on resize, an allowlisted text-layer copy, long-press pass-through, two-finger controls, pinch rejection, selection dismissal, a touch released outside the stage, keyboard page turns, a dialog focus trap, dot-segment bookmark identifiers, printed-page URLs, and right-to-left slider keys.
 
-The startup and continuous-scroll fixtures use a real jQuery UI slider with the Bookmarks panel absent and the navigation hidden. Startup tests jump to scan 242 from both earlier and later scans, in both reading modes, including fullscreen loss during navigation. Interaction tests use a simulated DOM. A separate Chromium rendering test compares every test word’s position, size and hit target with its native counterpart in portrait and landscape layouts (1024×1366, 1366×1024 and 768×1366). The continuous-scroll browser fixture tests width fitting, native lazy loading, unchanged farthest progress during prefetch, a `BookReader:userAction` event on every leaf change including slider prefetch, forward/backward bookmarking, memory eviction and reload, rotation, retry, mode switches, saved mode and resume. These tests do not use a physical iPad or authenticated loan. The native iPad selection popup, Safari-specific behaviour, and actual loan renewal still require on-device verification. Archive DOM or API changes can require an adapter update. This reader supports the usual left-to-right navigation. Image quality depends on the native scan resolution. Concurrent edits from multiple devices cannot be made fully atomic through the native bookmark API.
+The startup and continuous-scroll fixtures use a real jQuery UI slider with the Bookmarks panel absent and the navigation hidden. Startup tests jump to scan 242 from both earlier and later scans, in both reading modes, including fullscreen loss during navigation. Interaction tests use a simulated DOM. A separate Chromium rendering test compares every test word’s position, size and hit target with its native counterpart in portrait and landscape layouts (1024×1366, 1366×1024 and 768×1366). The continuous-scroll browser fixture tests width fitting, native lazy loading, unchanged farthest progress during prefetch, a `BookReader:userAction` event on every leaf change including slider prefetch, forward/backward bookmarking, memory eviction and reload, rotation, retry, mode switches, saved mode and resume. Slider jumps follow BookReader’s left-to-right or right-to-left page progression. On-screen tap zones stay in screen space: the left sixth goes to the previous leaf. Image quality depends on the native scan resolution. Concurrent edits from multiple devices cannot be made fully atomic through the native bookmark API.
 
-For development tests, run `npm install`, then `npm test` inside this folder. For rendered layout and continuous-scroll tests, run `npx playwright install chromium --only-shell`, then `npm run test:layout`, `npm run test:scroll`, and `npm run test:startup`. The userscript requires no build or dependencies.
+Cross-origin scans are covered by `npm run test:origin` in Chromium, Firefox and WebKit at a 1024×1366 viewport. The image is served from another host, with and without `Access-Control-Allow-Origin`. Archive’s image element has no `crossorigin` attribute, so both responses still taint the canvas: `drawImage` succeeds and `getImageData` raises `SecurityError`. Quiet Leaf displays that canvas and does not read pixels. A browser that throws from `drawImage` shows a recoverable error and keeps the last successful page.
+
+These tests do not use a physical iPad, a physical Mac, or an authenticated loan. The native iPad or macOS selection popup, Safari-specific behaviour, and actual loan renewal are outside this run. Archive DOM or API changes can require an adapter update. GitHub Actions runs `npm test`, `test:layout`, `test:scroll` and `test:startup` on Chromium. WebKit on Linux needs `npx playwright install-deps`, so the WebKit and Firefox browser suites stay local.
+
+For development tests, run `npm ci`, then `npm test` inside this folder. For rendered layout and continuous-scroll tests, run `npx playwright install chromium firefox webkit`, then `npm run test:layout`, `npm run test:scroll`, `npm run test:startup`, `npm run test:gulag` and `npm run test:origin`. Firefox packaging commands are in [firefox/README.md](firefox/README.md). The userscript requires no build or dependencies.
 
 Sources: [Internet Archive BookReader](https://github.com/internetarchive/bookreader), [Userscripts](https://github.com/quoid/userscripts).
 
@@ -123,4 +137,4 @@ Sources: [Internet Archive BookReader](https://github.com/internetarchive/bookre
 
 Run `npm run test:gulag` after `npx playwright install chromium webkit` (Linux may also require `npx playwright install-deps`). It runs in Chromium and Playwright WebKit, using the three actual volume page ranges (671, 717 and 579 scans), `n` labels, path URLs, duplicate native sliders, missing initial ARIA values, forward/backward scrolling, progress-safe prefetch, a jump to scan n400, volume identity and the final scan boundary. The fixture models Archive’s custom Left/Right key handler and suppressed programmatic slider changes. `QL_JQUERY_UI=/path/to/jquery-ui.js` lets the same suite run against a downloaded legacy slider implementation; 1.11.1 and the pinned 1.13.3 are both checked for this release. `QL_ENGINE=chromium` runs Chromium alone. `QL_SOURCE=/path/to/old.user.js QL_PROBE=1` limits the run to the initial transition for before/after diagnosis.
 
-These are controlled browser fixtures, not an authenticated live-Archive test or a physical iPad test. They do not validate iPadOS-specific touch gestures or loan renewal. Firefox packaging and its separate automated checks are documented in [firefox/README.md](firefox/README.md); Android device verification remains pending.
+These are controlled browser fixtures, not an authenticated live-Archive test or a physical iPad test. They do not validate iPadOS-specific touch gestures or loan renewal. The same Gulag fixture also runs in Playwright Firefox and includes a right-to-left slider jump. Firefox packaging, the macOS install route, and the iPad Firefox blocker are documented in [firefox/README.md](firefox/README.md).
